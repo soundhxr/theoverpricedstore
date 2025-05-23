@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Row, Col, ListGroup, Image, Card, Button } from 'react-bootstrap';
-import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import Message from '../components/Message';
@@ -9,9 +8,9 @@ import Loader from '../components/Loader';
 import {
   useDeliverOrderMutation,
   useGetOrderDetailsQuery,
-  useGetPaypalClientIdQuery,
   usePayOrderMutation,
 } from '../slices/ordersApiSlice';
+import axios from 'axios';
 
 const OrderScreen = () => {
   const { id: orderId } = useParams();
@@ -29,33 +28,6 @@ const OrderScreen = () => {
     useDeliverOrderMutation();
 
   const { userInfo } = useSelector((state) => state.auth);
-  const [{isPending}, paypalDispatch] = usePayPalScriptReducer();
-
-  const {
-    data: paypal,
-    isLoading: loadingPayPal,
-    error: errorPayPal,
-  } = useGetPaypalClientIdQuery();
-
-  useEffect(() => {
-    if (!errorPayPal && !loadingPayPal && paypal.clientId) {
-      const loadPaypalScript = async () => {
-        paypalDispatch({
-          type: 'resetOptions',
-          value: {
-            'client-id': paypal.clientId,
-            currency: 'USD',
-          },
-        });
-        paypalDispatch({ type: 'setLoadingStatus', value: 'pending' });
-      };
-      if (order && !order.isPaid) {
-        if (!window.paypal) {
-          loadPaypalScript();
-        }
-      }
-    }
-  }, [errorPayPal, loadingPayPal, order, paypal, paypalDispatch]);
 
   function onApprove(data, actions) {
     return actions.order.capture().then(async function (details) {
@@ -98,6 +70,33 @@ const OrderScreen = () => {
   const deliverHandler = async () => {
     await deliverOrder(orderId);
     refetch();
+  };
+
+  // Add Razorpay payment button logic
+  const openRazorpayCheckout = async () => {
+    const { data } = await axios.get('/api/config/razorpay');
+    const keyId = data.keyId;
+    const options = {
+      key: keyId,
+      amount: order.totalPrice * 100, // Amount is in paise
+      currency: 'INR',
+      name: 'Your Store',
+      description: 'Order Payment',
+      handler: async function (response) {
+        await payOrder({ orderId, details: response });
+        refetch();
+        toast.success('Order is paid');
+      },
+      prefill: {
+        name: order.user.name,
+        email: order.user.email,
+      },
+      theme: {
+        color: '#3399cc',
+      },
+    };
+    const rzp = new window.Razorpay(options);
+    rzp.open();
   };
 
   return isLoading ? (
@@ -213,28 +212,12 @@ const OrderScreen = () => {
               {!order.isPaid && (
                 <ListGroup.Item>
                   {loadingPay && <Loader />}
-
-                  {isPending ? (
-                    <Loader />
-                  ) : (
-                    <div>
-                      {/* THIS BUTTON IS FOR TESTING! REMOVE BEFORE PRODUCTION! */}
-                      {<Button
-                        style={{ marginBottom: '10px' }}
-                        onClick={onApproveTest}
-                      >
-                        Test Pay Order
-                      </Button>}
-
-                      <div>
-                        <PayPalButtons
-                          createOrder={createOrder}
-                          onApprove={onApprove}
-                          onError={onError}
-                        ></PayPalButtons>
-                      </div>
-                    </div>
-                  )}
+                  <Button
+                    style={{ marginBottom: '10px' }}
+                    onClick={openRazorpayCheckout}
+                  >
+                    Pay with Razorpay
+                  </Button>
                 </ListGroup.Item>
               )}
 

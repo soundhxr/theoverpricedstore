@@ -86,25 +86,16 @@ const getOrderById = asyncHandler(async (req, res) => {
 // @route   PUT /api/orders/:id/pay
 // @access  Private
 const updateOrderToPaid = asyncHandler(async (req, res) => {
-  // NOTE: here we need to verify the payment was made to PayPal before marking
-  // the order as paid
-  
-
-  // check if this transaction has been used before
-
-
   const order = await Order.findById(req.params.id);
 
   if (order) {
-    // check the correct amount was paid
-
     order.isPaid = true;
     order.paidAt = Date.now();
+    // Save Razorpay payment details
     order.paymentResult = {
-      id: req.body.id,
-      status: req.body.status,
-      update_time: req.body.update_time,
-      email_address: req.body.payer.email_address,
+      id: req.body.razorpay_payment_id,
+      order_id: req.body.razorpay_order_id,
+      signature: req.body.razorpay_signature,
     };
 
     const updatedOrder = await order.save();

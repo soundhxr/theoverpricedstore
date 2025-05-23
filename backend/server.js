@@ -31,10 +31,10 @@ app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/upload', uploadRoutes);
 
-app.get('/api/config/paypal', (req, res) => res.send({ clientId: process.env.PAYPAL_CLIENT_ID }))
-
 const __dirname = path.resolve()
 app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
+
+app.get('/api/config/razorpay', (req, res) => res.send({ keyId: process.env.RAZORPAY_KEY_ID }));
 
 app.use(errorHandler);
 app.use(notFound);
